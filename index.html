@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HTML Online Viewer</title>
+    <title>HTML Online Viewer - Advanced</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.3.0/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
@@ -12,42 +12,64 @@
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container-fluid">
             <a class="navbar-brand" href="#">HTML Online Viewer</a>
-            <div class="d-flex">
-                <button class="btn btn-primary me-2" id="preview-btn" title="Preview (Alt+1)"><i class="fas fa-eye"></i> Preview</button>
-                <button class="btn btn-info me-2" id="highlight-btn" title="Highlight (Alt+2)"><i class="fas fa-highlighter"></i> Highlight</button>
-                <button class="btn btn-secondary me-2" id="format-btn" title="Format (Alt+3)"><i class="fas fa-align-left"></i> Format</button>
-                <button class="btn btn-secondary me-2" id="expand-btn" title="Expand all (Alt+4)"><i class="fas fa-expand-arrows-alt"></i> Expand</button>
-                <button class="btn btn-secondary me-2" id="collapse-btn" title="Collapse all (Alt+5)"><i class="fas fa-compress-arrows-alt"></i> Collapse</button>
-                <button class="btn btn-success me-2" id="sample-btn" title="Sample (Alt+6)"><i class="fas fa-file-alt"></i> Sample</button>
-                <button class="btn btn-danger me-2" id="clear-btn" title="Clear (Alt+7)"><i class="fas fa-times"></i> Clear</button>
-                <label class="btn btn-warning me-2" for="import-file" title="Import"><i class="fas fa-upload"></i> Import<input type="file" id="import-file" style="display: none;"></label>
-                <button class="btn btn-info" id="export-btn" title="Export"><i class="fas fa-download"></i> Export</button>
+            <div class="d-flex flex-wrap">
+                <button class="btn btn-primary btn-sm me-2" id="preview-btn" title="Preview (Alt+1)"><i class="fas fa-eye"></i> Preview</button>
+                <button class="btn btn-info btn-sm me-2" id="highlight-btn" title="Highlight (Alt+2)"><i class="fas fa-highlighter"></i> Highlight</button>
+                <button class="btn btn-secondary btn-sm me-2" id="format-btn" title="Format (Alt+3)"><i class="fas fa-align-left"></i> Format</button>
+                <button class="btn btn-secondary btn-sm me-2" id="expand-btn" title="Expand all (Alt+4)"><i class="fas fa-expand-arrows-alt"></i></button>
+                <button class="btn btn-secondary btn-sm me-2" id="collapse-btn" title="Collapse all (Alt+5)"><i class="fas fa-compress-arrows-alt"></i></button>
+                <button class="btn btn-success btn-sm me-2" id="sample-btn" title="Sample (Alt+6)"><i class="fas fa-file-alt"></i></button>
+                <button class="btn btn-danger btn-sm me-2" id="clear-btn" title="Clear (Alt+7)"><i class="fas fa-times"></i></button>
+                <label class="btn btn-warning btn-sm me-2" for="import-file" title="Import"><i class="fas fa-upload"></i><input type="file" id="import-file" style="display: none;"></label>
+                <button class="btn btn-info btn-sm" id="export-btn" title="Export"><i class="fas fa-download"></i></button>
             </div>
         </div>
     </nav>
 
     <main class="container-fluid mt-3">
         <div class="row">
-            <div class="col-lg-6">
-                <div id="editor-container">
+            <div class="col-lg-6 d-flex flex-column">
+                <div id="editor-container" class="flex-grow-1">
                     <div id="editor"></div>
                 </div>
-                <div class="ai-section mt-3">
-                    <textarea id="ai-prompt" class="form-control" placeholder="Enter a prompt to generate or refactor HTML..."></textarea>
-                    <button id="ai-generate-btn" class="btn btn-primary mt-2">Generate with AI</button>
+                <div class="ai-section card mt-3">
+                    <div class="card-body">
+                        <h5 class="card-title">AI Assistant</h5>
+                        <textarea id="ai-prompt" class="form-control" placeholder="Enter a prompt... (e.g., 'Create a login form')"></textarea>
+                        <div class="btn-group mt-2">
+                            <button id="ai-generate-btn" class="btn btn-primary">Generate</button>
+                            <button id="ai-fix-btn" class="btn btn-secondary">Fix Code</button>
+                            <button id="ai-optimize-btn" class="btn btn-secondary">Optimize</button>
+                        </div>
+                    </div>
                 </div>
             </div>
-            <div class="col-lg-6">
-                <iframe id="preview-iframe"></iframe>
+            <div class="col-lg-6 d-flex flex-column">
+                <div class="preview-toolbar d-flex justify-content-center align-items-center p-2 bg-light border rounded-top">
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-secondary" data-res="320x480"><i class="fas fa-mobile-alt"></i> Mobile S</button>
+                        <button class="btn btn-outline-secondary" data-res="425x567"><i class="fas fa-mobile-alt"></i> Mobile L</button>
+                        <button class="btn btn-outline-secondary" data-res="768x1024"><i class="fas fa-tablet-alt"></i> Tablet</button>
+                        <button class="btn btn-outline-secondary" data-res="1024x768"><i class="fas fa-laptop"></i> Laptop</button>
+                        <button class="btn btn-outline-secondary active" data-res="100%x100%"><i class="fas fa-desktop"></i> Desktop</button>
+                    </div>
+                </div>
+                <iframe id="preview-iframe" class="flex-grow-1"></iframe>
+                <div class="analysis-section card mt-3">
+                    <div class="card-header">
+                        <ul class="nav nav-tabs card-header-tabs">
+                            <li class="nav-item"><a class="nav-link active" href="#seo-analysis" data-bs-toggle="tab">SEO Analysis</a></li>
+                            <li class="nav-item"><a class="nav-link" href="#performance" data-bs-toggle="tab">Performance</a></li>
+                        </ul>
+                    </div>
+                    <div class="card-body tab-content">
+                        <div class="tab-pane active" id="seo-analysis"></div>
+                        <div class="tab-pane" id="performance"></div>
+                    </div>
+                </div>
             </div>
         </div>
     </main>
-
-    <footer class="footer mt-auto py-3 bg-light">
-        <div class="container text-center">
-            <span class="text-muted">© 2025 OnlineViewer.net</span>
-        </div>
-    </footer>
 
     <!-- Core Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.0/jquery.min.js"></script>

@@ -3,16 +3,12 @@ $(document).ready(function() {
     // INITIALIZATION
     // =================================================================================
 
-    // Initialize Ace Editor
     let editor = ace.edit("editor");
-    editor.setTheme("ace/theme/monokai");
+    editor.setTheme("ace/theme/tomorrow_night");
     editor.session.setMode("ace/mode/html");
     editor.session.setUseWrapMode(true);
 
-    // Initialize JS Beautifier
     const beautify = html_beautify;
-
-    // Gemini API Configuration
     const GEMINI_API_KEY = "AIzaSyDhuFGySigse5Yk8K2dMcQ8Jxv8_Je1bRA";
     const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`;
 
@@ -20,115 +16,68 @@ $(document).ready(function() {
     // CORE FUNCTIONS
     // =================================================================================
 
-    /**
-     * Updates the live preview iframe with the editor's content.
-     */
     function updatePreview() {
         const previewFrame = document.getElementById('preview-iframe');
         const preview = previewFrame.contentDocument || previewFrame.contentWindow.document;
         preview.open();
         preview.write(editor.getValue());
         preview.close();
+        runAnalysis();
     }
 
-    /**
-     * Opens a new tab with the rendered HTML preview.
-     */
     function openPreviewInNewTab() {
         const newTab = window.open();
         newTab.document.write(editor.getValue());
         newTab.document.close();
     }
 
-    /**
-     * Opens a new tab with the syntax-highlighted HTML code.
-     */
     function openHighlightedCodeInNewTab() {
         const newTab = window.open();
         const highlightedCode = hljs.highlightAuto(editor.getValue()).value;
-        newTab.document.write(`<style>body{background-color:#282a36;color:#f8f8f2;}pre{margin:0;}</style><pre><code>${highlightedCode}</code></pre>`);
+        newTab.document.write(`<style>body{background-color:#282a36;color:#f8f8f2;}</style><pre><code>${highlightedCode}</code></pre>`);
         newTab.document.close();
     }
 
-    /**
-     * Formats the code in the editor using JS Beautifier.
-     */
     function formatCode() {
-        const currentCode = editor.getValue();
-        const formattedCode = beautify(currentCode, {
-            indent_size: 4,
-            space_in_empty_paren: true
-        });
-        editor.setValue(formattedCode, -1);
+        editor.setValue(beautify(editor.getValue(), { indent_size: 4, space_in_empty_paren: true }), -1);
     }
 
-    /**
-     * Loads a sample HTML document into the editor.
-     */
     function loadSample() {
         const sampleHtml = `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sample Page</title>
-    <style>
-        body { font-family: sans-serif; line-height: 1.6; padding: 20px; }
-        h1 { color: #333; }
-    </style>
 </head>
 <body>
-    <h1>Welcome to the HTML Viewer</h1>
-    <p>This is a sample HTML document.</p>
-    <ul>
-        <li>Edit the code on the left.</li>
-        <li>See the live preview on the right.</li>
-    </ul>
+    <h1>Welcome!</h1>
+    <p>This is a sample document.</p>
 </body>
 </html>`;
         editor.setValue(sampleHtml, -1);
     }
 
-    /**
-     * Handles file import and loads the content into the editor.
-     * @param {Event} event - The file input change event.
-     */
     function importFile(event) {
         const file = event.target.files[0];
         if (file) {
             const reader = new FileReader();
-            reader.onload = function(e) {
-                editor.setValue(e.target.result, -1);
-            };
+            reader.onload = (e) => editor.setValue(e.target.result, -1);
             reader.readAsText(file);
         }
     }
 
-    /**
-     * Exports the editor content as a .html file.
-     */
     function exportFile() {
-        const blob = new Blob([editor.getValue()], { type: "text/html;charset=utf-8" });
-        saveAs(blob, "document.html");
+        saveAs(new Blob([editor.getValue()], { type: "text/html;charset=utf-8" }), "document.html");
     }
 
-    /**
-     * Generates or refactors code using the Gemini API.
-     */
-    async function generateWithAI() {
-        const prompt = $('#ai-prompt').val();
-        const currentCode = editor.getValue();
-        if (!prompt) {
-            alert("Please enter a prompt for the AI.");
-            return;
-        }
+    // =================================================================================
+    // ADVANCED FEATURES
+    // =================================================================================
 
+    async function generateWithAI(prompt) {
+        const currentCode = editor.getValue();
         const requestBody = {
-            contents: [{
-                parts: [{
-                    text: `Prompt: ${prompt}\n\nCurrent HTML Code:\n\`\`\`html\n${currentCode}\n\`\`\``
-                }]
-            }]
+            contents: [{ parts: [{ text: `${prompt}\n\nHTML Code:\n\`\`\`html\n${currentCode}\n\`\`\`` }] }]
         };
 
         try {
@@ -137,34 +86,51 @@ $(document).ready(function() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(requestBody)
             });
-
-            if (!response.ok) {
-                throw new Error(`API request failed with status ${response.status}`);
-            }
-
+            if (!response.ok) throw new Error(`API request failed with status ${response.status}`);
             const data = await response.json();
             const generatedText = data.candidates[0].content.parts[0].text;
-            // Clean the response to get only the code block
             const codeBlock = generatedText.match(/```html\n([\s\S]*?)\n```/);
-            if (codeBlock && codeBlock[1]) {
-                editor.setValue(codeBlock[1], -1);
-            } else {
-                editor.setValue(generatedText, -1);
-            }
+            editor.setValue(codeBlock ? codeBlock[1] : generatedText, -1);
         } catch (error) {
             console.error("AI Generation Error:", error);
-            alert("Failed to generate code. Please check the console for details.");
+            alert("Failed to generate code. Check the console for details.");
         }
+    }
+
+    function runAnalysis() {
+        const doc = new DOMParser().parseFromString(editor.getValue(), 'text/html');
+        runSEOAnalysis(doc);
+        runPerformanceAnalysis(doc);
+    }
+
+    function runSEOAnalysis(doc) {
+        let results = '<ul>';
+        if (!doc.title) results += '<li><span class="badge bg-danger">Error</span> Missing title tag.</li>';
+        if (!doc.querySelector('meta[name="description"]')) results += '<li><span class="badge bg-warning">Warning</span> Missing meta description.</li>';
+        if (!doc.querySelector('h1')) results += '<li><span class="badge bg-warning">Warning</span> Missing H1 tag.</li>';
+        doc.querySelectorAll('img:not([alt])').forEach(() => {
+            results += '<li><span class="badge bg-warning">Warning</span> Image missing alt attribute.</li>';
+        });
+        results += '</ul>';
+        $('#seo-analysis').html(results);
+    }
+
+    function runPerformanceAnalysis(doc) {
+        let results = '<ul>';
+        const scripts = doc.querySelectorAll('script[src]');
+        const stylesheets = doc.querySelectorAll('link[rel="stylesheet"]');
+        if (scripts.length > 2) results += `<li><span class="badge bg-info">Info</span> ${scripts.length} external scripts. Consider bundling.</li>`;
+        if (stylesheets.length > 2) results += `<li><span class="badge bg-info">Info</span> ${stylesheets.length} external stylesheets. Consider bundling.</li>`;
+        results += `<li><span class="badge bg-info">Info</span> Total elements: ${doc.getElementsByTagName('*').length}</li>`;
+        results += '</ul>';
+        $('#performance').html(results);
     }
 
     // =================================================================================
     // EVENT LISTENERS
     // =================================================================================
 
-    // Editor input listener for live preview
     editor.session.on('change', updatePreview);
-
-    // Toolbar button listeners
     $('#preview-btn').on('click', openPreviewInNewTab);
     $('#highlight-btn').on('click', openHighlightedCodeInNewTab);
     $('#format-btn').on('click', formatCode);
@@ -174,40 +140,29 @@ $(document).ready(function() {
     $('#clear-btn').on('click', () => editor.setValue("", -1));
     $('#import-file').on('change', importFile);
     $('#export-btn').on('click', exportFile);
-    $('#ai-generate-btn').on('click', generateWithAI);
 
-    // Keyboard shortcuts
+    $('#ai-generate-btn').on('click', () => generateWithAI($('#ai-prompt').val()));
+    $('#ai-fix-btn').on('click', () => generateWithAI("Fix any errors in the following HTML code."));
+    $('#ai-optimize-btn').on('click', () => generateWithAI("Optimize the following HTML code for performance and SEO."));
+
+    $('.preview-toolbar .btn').on('click', function() {
+        $('.preview-toolbar .btn').removeClass('active');
+        $(this).addClass('active');
+        const [width, height] = $(this).data('res').split('x');
+        $('#preview-iframe').css({ 'width': width, 'height': height });
+    });
+
     $(document).on('keydown', function(e) {
         if (e.altKey) {
+            e.preventDefault();
             switch (e.which) {
-                case 49: // Alt+1
-                    e.preventDefault();
-                    openPreviewInNewTab();
-                    break;
-                case 50: // Alt+2
-                    e.preventDefault();
-                    openHighlightedCodeInNewTab();
-                    break;
-                case 51: // Alt+3
-                    e.preventDefault();
-                    formatCode();
-                    break;
-                case 52: // Alt+4
-                    e.preventDefault();
-                    editor.execCommand("expandAll");
-                    break;
-                case 53: // Alt+5
-                    e.preventDefault();
-                    editor.session.foldAll();
-                    break;
-                case 54: // Alt+6
-                    e.preventDefault();
-                    loadSample();
-                    break;
-                case 55: // Alt+7
-                    e.preventDefault();
-                    editor.setValue("", -1);
-                    break;
+                case 49: openPreviewInNewTab(); break;
+                case 50: openHighlightedCodeInNewTab(); break;
+                case 51: formatCode(); break;
+                case 52: editor.execCommand("expandAll"); break;
+                case 53: editor.session.foldAll(); break;
+                case 54: loadSample(); break;
+                case 55: editor.setValue("", -1); break;
             }
         }
     });

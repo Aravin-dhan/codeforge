@@ -1,0 +1,22 @@
+{
+  "name": "codeforge",
+  "version": "1.0.0",
+  "description": "A browser-based HTML, CSS, and JavaScript playground.",
+  "main": "script.js",
+  "scripts": {
+    "start": "serve",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "html",
+    "css",
+    "javascript",
+    "playground",
+    "editor"
+  ],
+  "author": "Kilo Code",
+  "license": "MIT",
+  "dependencies": {
+    "serve": "^14.0.1"
+  }
+}

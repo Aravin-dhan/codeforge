@@ -1,193 +1,221 @@
-/**
- * CodeForge - A browser-based Universal File Viewer and Playground.
- *
- * This script initializes a CodeMirror editor, handles UI interactions,
- * manages the live preview for various file types, and implements
- * features like persistence and sharing.
- */
-document.addEventListener('DOMContentLoaded', () => {
+$(document).ready(function() {
     // =================================================================================
     // INITIALIZATION
     // =================================================================================
 
-    let editor = CodeMirror(document.getElementById('editor'), {
-        lineNumbers: true,
-        theme: 'default',
-        gutters: ["CodeMirror-lint-markers"],
-        lint: true,
-        extraKeys: {"Ctrl-Space": "autocomplete"},
-        emmet: { mark: true }
-    });
+    // Initialize Ace Editor
+    let editor = ace.edit("editor");
+    editor.setTheme("ace/theme/monokai");
+    editor.session.setMode("ace/mode/html");
+    editor.session.setUseWrapMode(true);
+
+    // Initialize JS Beautifier
+    const beautify = html_beautify;
+
+    // Gemini API Configuration
+    const GEMINI_API_KEY = "AIzaSyDhuFGySigse5Yk8K2dMcQ8Jxv8_Je1bRA";
+    const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`;
 
     // =================================================================================
-    // UI & LAYOUT
+    // CORE FUNCTIONS
     // =================================================================================
 
-    const themeToggle = document.getElementById('theme-toggle');
-    const htmlElement = document.documentElement;
+    /**
+     * Updates the live preview iframe with the editor's content.
+     */
+    function updatePreview() {
+        const previewFrame = document.getElementById('preview-iframe');
+        const preview = previewFrame.contentDocument || previewFrame.contentWindow.document;
+        preview.open();
+        preview.write(editor.getValue());
+        preview.close();
+    }
 
-    themeToggle.addEventListener('change', () => {
-        const isDark = themeToggle.checked;
-        htmlElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
-        editor.setOption('theme', isDark ? 'material-dark' : 'default');
-    });
+    /**
+     * Opens a new tab with the rendered HTML preview.
+     */
+    function openPreviewInNewTab() {
+        const newTab = window.open();
+        newTab.document.write(editor.getValue());
+        newTab.document.close();
+    }
 
-    const resizerY = document.querySelector('.resizer-y');
-    const editorContainer = document.getElementById('editor-container');
-    const previewContainer = document.getElementById('preview-container');
-    let isResizing = false;
+    /**
+     * Opens a new tab with the syntax-highlighted HTML code.
+     */
+    function openHighlightedCodeInNewTab() {
+        const newTab = window.open();
+        const highlightedCode = hljs.highlightAuto(editor.getValue()).value;
+        newTab.document.write(`<style>body{background-color:#282a36;color:#f8f8f2;}pre{margin:0;}</style><pre><code>${highlightedCode}</code></pre>`);
+        newTab.document.close();
+    }
 
-    resizerY.addEventListener('mousedown', () => {
-        isResizing = true;
-        document.addEventListener('mousemove', handleMouseMove);
-        document.addEventListener('mouseup', () => {
-            isResizing = false;
-            document.removeEventListener('mousemove', handleMouseMove);
+    /**
+     * Formats the code in the editor using JS Beautifier.
+     */
+    function formatCode() {
+        const currentCode = editor.getValue();
+        const formattedCode = beautify(currentCode, {
+            indent_size: 4,
+            space_in_empty_paren: true
         });
-    });
+        editor.setValue(formattedCode, -1);
+    }
 
-    function handleMouseMove(e) {
-        if (!isResizing) return;
-        const totalWidth = document.getElementById('main-container').offsetWidth;
-        const newLeftWidth = e.clientX;
-        const leftPercent = (newLeftWidth / totalWidth) * 100;
-        if (leftPercent > 10 && leftPercent < 90) {
-            editorContainer.style.flexBasis = `${leftPercent}%`;
-            previewContainer.style.flexBasis = `${100 - leftPercent}%`;
+    /**
+     * Loads a sample HTML document into the editor.
+     */
+    function loadSample() {
+        const sampleHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sample Page</title>
+    <style>
+        body { font-family: sans-serif; line-height: 1.6; padding: 20px; }
+        h1 { color: #333; }
+    </style>
+</head>
+<body>
+    <h1>Welcome to the HTML Viewer</h1>
+    <p>This is a sample HTML document.</p>
+    <ul>
+        <li>Edit the code on the left.</li>
+        <li>See the live preview on the right.</li>
+    </ul>
+</body>
+</html>`;
+        editor.setValue(sampleHtml, -1);
+    }
+
+    /**
+     * Handles file import and loads the content into the editor.
+     * @param {Event} event - The file input change event.
+     */
+    function importFile(event) {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                editor.setValue(e.target.result, -1);
+            };
+            reader.readAsText(file);
         }
     }
 
-    // =================================================================================
-    // FILE HANDLING & PREVIEW
-    // =================================================================================
+    /**
+     * Exports the editor content as a .html file.
+     */
+    function exportFile() {
+        const blob = new Blob([editor.getValue()], { type: "text/html;charset=utf-8" });
+        saveAs(blob, "document.html");
+    }
 
-    const fileTypeSelector = document.getElementById('file-type');
-    let debounceTimer;
+    /**
+     * Generates or refactors code using the Gemini API.
+     */
+    async function generateWithAI() {
+        const prompt = $('#ai-prompt').val();
+        const currentCode = editor.getValue();
+        if (!prompt) {
+            alert("Please enter a prompt for the AI.");
+            return;
+        }
 
-    const updatePreview = () => {
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => {
-            const content = editor.getValue();
-            const fileType = fileTypeSelector.value;
-            const iframe = document.getElementById('preview-iframe');
-            const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-
-            iframeDoc.open();
-            switch (fileType) {
-                case 'html':
-                    iframeDoc.write(content);
-                    break;
-                case 'css':
-                    iframeDoc.write(`<style>${content}</style>`);
-                    break;
-                case 'javascript':
-                    iframeDoc.write(`<script>${content}<\/script>`);
-                    break;
-                case 'markdown':
-                    iframeDoc.write(marked.parse(content));
-                    break;
-                case 'json':
-                    try {
-                        const formatted = JSON.stringify(JSON.parse(content), null, 2);
-                        iframeDoc.write(`<pre>${formatted}</pre>`);
-                    } catch (e) {
-                        iframeDoc.write(`<pre>Invalid JSON: ${e.message}</pre>`);
-                    }
-                    break;
-                default:
-                    iframeDoc.write(`<pre>${content}</pre>`);
-            }
-            iframeDoc.close();
-            saveStateToLocalStorage();
-        }, 300);
-    };
-
-    editor.on('change', updatePreview);
-    fileTypeSelector.addEventListener('change', () => {
-        const fileType = fileTypeSelector.value;
-        let mode = fileType;
-        if (fileType === 'html') mode = 'xml';
-        editor.setOption('mode', mode);
-        updatePreview();
-    });
-
-    // =================================================================================
-    // PROJECT MANAGEMENT
-    // =================================================================================
-
-    function saveStateToLocalStorage() {
-        const state = {
-            content: editor.getValue(),
-            fileType: fileTypeSelector.value,
-            theme: themeToggle.checked ? 'dark' : 'light'
+        const requestBody = {
+            contents: [{
+                parts: [{
+                    text: `Prompt: ${prompt}\n\nCurrent HTML Code:\n\`\`\`html\n${currentCode}\n\`\`\``
+                }]
+            }]
         };
-        localStorage.setItem('codeforge_universal_state', JSON.stringify(state));
-    }
 
-    function loadStateFromLocalStorage() {
-        const state = JSON.parse(localStorage.getItem('codeforge_universal_state'));
-        if (state) {
-            editor.setValue(state.content || '');
-            fileTypeSelector.value = state.fileType || 'html';
-            editor.setOption('mode', state.fileType === 'html' ? 'xml' : state.fileType);
-            if (state.theme === 'dark') {
-                themeToggle.checked = true;
-                htmlElement.setAttribute('data-theme', 'dark');
-                editor.setOption('theme', 'material-dark');
+        try {
+            const response = await fetch(GEMINI_API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestBody)
+            });
+
+            if (!response.ok) {
+                throw new Error(`API request failed with status ${response.status}`);
             }
-            updatePreview();
+
+            const data = await response.json();
+            const generatedText = data.candidates[0].content.parts[0].text;
+            // Clean the response to get only the code block
+            const codeBlock = generatedText.match(/```html\n([\s\S]*?)\n```/);
+            if (codeBlock && codeBlock[1]) {
+                editor.setValue(codeBlock[1], -1);
+            } else {
+                editor.setValue(generatedText, -1);
+            }
+        } catch (error) {
+            console.error("AI Generation Error:", error);
+            alert("Failed to generate code. Please check the console for details.");
         }
     }
 
-    const shareBtn = document.getElementById('share-btn');
-    shareBtn.addEventListener('click', () => {
-        const state = {
-            content: editor.getValue(),
-            fileType: fileTypeSelector.value
-        };
-        const jsonString = JSON.stringify(state);
-        const encoded = btoa(jsonString);
-        const url = `${window.location.origin}${window.location.pathname}#${encoded}`;
-        navigator.clipboard.writeText(url).then(() => {
-            alert('Shareable URL copied to clipboard!');
-        });
-    });
+    // =================================================================================
+    // EVENT LISTENERS
+    // =================================================================================
 
-    function loadStateFromUrl() {
-        if (window.location.hash) {
-            try {
-                const encoded = window.location.hash.substring(1);
-                const decoded = atob(encoded);
-                const state = JSON.parse(decoded);
-                if (state) {
-                    editor.setValue(state.content || '');
-                    fileTypeSelector.value = state.fileType || 'html';
-                    editor.setOption('mode', state.fileType === 'html' ? 'xml' : state.fileType);
-                    updatePreview();
-                }
-            } catch (error) {
-                console.error('Failed to load state from URL:', error);
-                loadStateFromLocalStorage();
+    // Editor input listener for live preview
+    editor.session.on('change', updatePreview);
+
+    // Toolbar button listeners
+    $('#preview-btn').on('click', openPreviewInNewTab);
+    $('#highlight-btn').on('click', openHighlightedCodeInNewTab);
+    $('#format-btn').on('click', formatCode);
+    $('#expand-btn').on('click', () => editor.execCommand("expandAll"));
+    $('#collapse-btn').on('click', () => editor.session.foldAll());
+    $('#sample-btn').on('click', loadSample);
+    $('#clear-btn').on('click', () => editor.setValue("", -1));
+    $('#import-file').on('change', importFile);
+    $('#export-btn').on('click', exportFile);
+    $('#ai-generate-btn').on('click', generateWithAI);
+
+    // Keyboard shortcuts
+    $(document).on('keydown', function(e) {
+        if (e.altKey) {
+            switch (e.which) {
+                case 49: // Alt+1
+                    e.preventDefault();
+                    openPreviewInNewTab();
+                    break;
+                case 50: // Alt+2
+                    e.preventDefault();
+                    openHighlightedCodeInNewTab();
+                    break;
+                case 51: // Alt+3
+                    e.preventDefault();
+                    formatCode();
+                    break;
+                case 52: // Alt+4
+                    e.preventDefault();
+                    editor.execCommand("expandAll");
+                    break;
+                case 53: // Alt+5
+                    e.preventDefault();
+                    editor.session.foldAll();
+                    break;
+                case 54: // Alt+6
+                    e.preventDefault();
+                    loadSample();
+                    break;
+                case 55: // Alt+7
+                    e.preventDefault();
+                    editor.setValue("", -1);
+                    break;
             }
-        } else {
-            loadStateFromLocalStorage();
         }
-    }
-
-    const exportZipBtn = document.getElementById('export-zip-btn');
-    exportZipBtn.addEventListener('click', () => {
-        const zip = new JSZip();
-        const fileType = fileTypeSelector.value;
-        const extension = fileType === 'javascript' ? 'js' : fileType;
-        zip.file(`file.${extension}`, editor.getValue());
-        zip.generateAsync({ type: 'blob' }).then((content) => {
-            saveAs(content, 'codeforge-project.zip');
-        });
     });
 
     // =================================================================================
     // INITIAL LOAD
     // =================================================================================
 
-    loadStateFromUrl();
+    loadSample();
+    updatePreview();
 });
